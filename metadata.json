@@ -1,0 +1,5 @@
+{
+  "name": "Validador de Funil",
+  "description": "Ferramenta para validar métricas de criativos e páginas de vendas, calculando CTR, CPC, ROI e lucro.",
+  "requestFramePermissions": []
+}
