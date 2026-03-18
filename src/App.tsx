@@ -4,8 +4,9 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Trash2, RefreshCcw, TrendingUp, TrendingDown, DollarSign, MousePointer2, Eye, ShoppingCart, Search, ChevronUp, ChevronDown, Download, ClipboardPaste, X } from 'lucide-react';
+import { Plus, Trash2, RefreshCcw, TrendingUp, TrendingDown, DollarSign, MousePointer2, Eye, ShoppingCart, Search, ChevronUp, ChevronDown, Download, ClipboardPaste, X, CheckCircle2, AlertCircle, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { FunnelData } from './types';
 
 type SortKey = 'campanha' | 'ctr' | 'cpc' | 'conv' | 'receita' | 'lucro' | 'roi';
@@ -27,6 +28,7 @@ export default function App() {
     impressoes: '',
     cliques: '',
     visitas: '',
+    checkouts: '',
     vendas: '',
     gasto: '',
     preco: ''
@@ -65,6 +67,7 @@ export default function App() {
       impressoes: Number(form.impressoes) || 0,
       cliques: Number(form.cliques) || 0,
       visitas: Number(form.visitas) || 0,
+      checkouts: Number(form.checkouts) || 0,
       vendas: Number(form.vendas) || 0,
       gasto: Number(form.gasto) || 0,
       preco: Number(form.preco) || 0,
@@ -78,6 +81,7 @@ export default function App() {
       impressoes: '',
       cliques: '',
       visitas: '',
+      checkouts: '',
       vendas: '',
       gasto: '',
       preco: ''
@@ -103,7 +107,13 @@ export default function App() {
     const lucro = receita - d.gasto;
     const roi = d.gasto > 0 ? (lucro / d.gasto) * 100 : 0;
 
-    return { ctr, cpc, conv, receita, lucro, roi };
+    // New Validation Metrics
+    const clickToPage = d.cliques > 0 ? (d.visitas / d.cliques) * 100 : 0;
+    const pageToCheckout = d.visitas > 0 ? (d.checkouts / d.visitas) * 100 : 0;
+    const checkoutToPurchase = d.checkouts > 0 ? (d.vendas / d.checkouts) * 100 : 0;
+    const finalConv = d.cliques > 0 ? (d.vendas / d.cliques) * 100 : 0;
+
+    return { ctr, cpc, conv, receita, lucro, roi, clickToPage, pageToCheckout, checkoutToPurchase, finalConv };
   };
 
   const handleSort = (key: SortKey) => {
@@ -159,13 +169,13 @@ export default function App() {
     if (filteredAndSortedData.length === 0) return;
 
     const headers = [
-      'Campanha', 'Criativo', 'Pagina', 'Impressoes', 'Cliques', 'Visitas', 
+      'Campanha', 'Criativo', 'Pagina', 'Impressoes', 'Cliques', 'Visitas', 'Checkouts',
       'Vendas', 'Gasto', 'Preco', 'CTR (%)', 'CPC (R$)', 'Conversao (%)', 
-      'Receita (R$)', 'Lucro (R$)', 'ROI (%)'
+      'Receita (R$)', 'Lucro (R$)', 'ROI (%)', 'Clique->Pagina (%)', 'Pagina->Checkout (%)', 'Checkout->Compra (%)'
     ];
 
     const rows = filteredAndSortedData.map(d => {
-      const { ctr, cpc, conv, receita, lucro, roi } = calculateMetrics(d);
+      const { ctr, cpc, conv, receita, lucro, roi, clickToPage, pageToCheckout, checkoutToPurchase } = calculateMetrics(d);
       return [
         d.campanha,
         d.criativo,
@@ -173,6 +183,7 @@ export default function App() {
         d.impressoes,
         d.cliques,
         d.visitas,
+        d.checkouts,
         d.vendas,
         d.gasto,
         d.preco,
@@ -181,7 +192,10 @@ export default function App() {
         conv.toFixed(2),
         receita.toFixed(2),
         lucro.toFixed(2),
-        roi.toFixed(2)
+        roi.toFixed(2),
+        clickToPage.toFixed(2),
+        pageToCheckout.toFixed(2),
+        checkoutToPurchase.toFixed(2)
       ].map(val => `"${val}"`).join(',');
     });
 
@@ -207,7 +221,7 @@ export default function App() {
       // Split by tab (Excel/FB copy paste) or comma
       const columns = line.includes('\t') ? line.split('\t') : line.split(',');
       
-      if (columns.length >= 2) {
+          if (columns.length >= 2) {
         newEntries.push({
           id: crypto.randomUUID(),
           campanha: columns[0]?.trim() || 'Importado',
@@ -216,9 +230,10 @@ export default function App() {
           impressoes: Number(columns[3]?.replace(/[^\d.-]/g, '')) || 0,
           cliques: Number(columns[4]?.replace(/[^\d.-]/g, '')) || 0,
           visitas: Number(columns[5]?.replace(/[^\d.-]/g, '')) || 0,
-          vendas: Number(columns[6]?.replace(/[^\d.-]/g, '')) || 0,
-          gasto: Number(columns[7]?.replace(/[^\d.-]/g, '')) || 0,
-          preco: Number(columns[8]?.replace(/[^\d.-]/g, '')) || 0,
+          checkouts: Number(columns[6]?.replace(/[^\d.-]/g, '')) || 0,
+          vendas: Number(columns[7]?.replace(/[^\d.-]/g, '')) || 0,
+          gasto: Number(columns[8]?.replace(/[^\d.-]/g, '')) || 0,
+          preco: Number(columns[9]?.replace(/[^\d.-]/g, '')) || 0,
         });
       }
     });
@@ -330,6 +345,17 @@ export default function App() {
                   className="w-full bg-[#1e1e1e] border border-white/10 rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:border-[#4da3ff] transition-colors"
                 />
               </div>
+              <div className="relative">
+                <ShoppingCart className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                <input 
+                  type="number" 
+                  name="checkouts" 
+                  value={form.checkouts} 
+                  onChange={handleInputChange}
+                  placeholder="Checkouts (Inic. Compra)" 
+                  className="w-full bg-[#1e1e1e] border border-white/10 rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:border-[#4da3ff] transition-colors"
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -378,6 +404,98 @@ export default function App() {
             Adicionar ao Relatório
           </button>
         </section>
+
+        {/* ROI Chart Section */}
+        {dados.length > 0 && (
+          <section className="mb-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 bg-[#151515] p-6 rounded-2xl border border-white/5 shadow-xl">
+              <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
+                <TrendingUp size={20} className="text-[#4da3ff]" />
+                ROI por Campanha (%)
+              </h3>
+              <div className="h-80 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={filteredAndSortedData.map(d => ({ name: d.campanha, roi: calculateMetrics(d).roi }))}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                    <XAxis 
+                      dataKey="name" 
+                      stroke="#666" 
+                      fontSize={12} 
+                      tickLine={false} 
+                      axisLine={false}
+                    />
+                    <YAxis 
+                      stroke="#666" 
+                      fontSize={12} 
+                      tickLine={false} 
+                      axisLine={false}
+                      tickFormatter={(value) => `${value}%`}
+                    />
+                    <Tooltip 
+                      cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                      contentStyle={{ backgroundColor: '#151515', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                      itemStyle={{ color: '#4da3ff' }}
+                    />
+                    <Bar dataKey="roi" radius={[4, 4, 0, 0]}>
+                      {filteredAndSortedData.map((entry, index) => {
+                        const roi = calculateMetrics(entry).roi;
+                        return <Cell key={`cell-${index}`} fill={roi >= 0 ? '#00e676' : '#ff5252'} />;
+                      })}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="bg-[#151515] p-6 rounded-2xl border border-white/5 shadow-xl">
+              <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
+                <CheckCircle2 size={20} className="text-emerald-500" />
+                Benchmarks de Validação
+              </h3>
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-white/5 border border-white/5">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm text-gray-400">Clique → Página</span>
+                    <span className="text-sm font-bold text-emerald-500">70%+</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500 w-[70%]" />
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl bg-white/5 border border-white/5">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm text-gray-400">Página → Checkout</span>
+                    <span className="text-sm font-bold text-emerald-500">5%+</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500 w-[5%]" />
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl bg-white/5 border border-white/5">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm text-gray-400">Checkout → Compra</span>
+                    <span className="text-sm font-bold text-emerald-500">30%+</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500 w-[30%]" />
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl bg-white/5 border border-white/5">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm text-gray-400">Conversão Final</span>
+                    <span className="text-sm font-bold text-emerald-500">1% - 5%</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden flex">
+                    <div className="h-full bg-emerald-500 w-[5%] ml-[1%]" />
+                  </div>
+                </div>
+              </div>
+              <p className="mt-6 text-[10px] text-gray-500 leading-relaxed italic">
+                * Use estes valores como referência para pausar ou escalar seus criativos e páginas.
+              </p>
+            </div>
+          </section>
+        )}
 
         {/* Filters and Search */}
         <div className="mb-4 flex flex-col md:flex-row gap-4 items-center justify-between">
@@ -464,6 +582,7 @@ export default function App() {
                     <SortIndicator column="roi" />
                   </div>
                 </th>
+                <th className="p-4 text-xs font-bold text-[#4da3ff] uppercase tracking-widest text-center">Validação</th>
                 <th className="p-4 text-xs font-bold text-[#4da3ff] uppercase tracking-widest text-right">Ações</th>
               </tr>
             </thead>
@@ -475,13 +594,25 @@ export default function App() {
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                   >
-                    <td colSpan={8} className="p-12 text-center text-gray-500 italic">
+                    <td colSpan={9} className="p-12 text-center text-gray-500 italic">
                       {searchTerm ? 'Nenhum resultado encontrado para sua busca.' : 'Nenhum dado adicionado ainda.'}
                     </td>
                   </motion.tr>
                 ) : (
                   filteredAndSortedData.map((d) => {
-                    const { ctr, cpc, conv, receita, lucro, roi } = calculateMetrics(d);
+                    const { ctr, cpc, conv, receita, lucro, roi, clickToPage, pageToCheckout, checkoutToPurchase, finalConv } = calculateMetrics(d);
+                    
+                    const getValidationStatus = () => {
+                      const issues = [];
+                      if (clickToPage < 70) issues.push('Carregamento Lento/Curiosidade');
+                      if (pageToCheckout < 5) issues.push('Oferta Fraca/Página Ruim');
+                      if (checkoutToPurchase < 30) issues.push('Checkout Complexo/Frete');
+                      if (finalConv < 1) issues.push('Baixa Conversão Geral');
+                      return issues;
+                    };
+
+                    const validationIssues = getValidationStatus();
+
                     return (
                       <motion.tr 
                         key={d.id}
@@ -509,6 +640,25 @@ export default function App() {
                           <span className={`px-2 py-1 rounded text-xs ${roi >= 0 ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
                             {roi.toFixed(0)}%
                           </span>
+                        </td>
+                        <td className="p-4 text-center">
+                          <div className="flex flex-col items-center gap-1">
+                            {validationIssues.length === 0 ? (
+                              <div className="flex items-center gap-1 text-emerald-500 text-[10px] font-bold uppercase">
+                                <CheckCircle2 size={12} /> Validada
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1 text-amber-500 text-[10px] font-bold uppercase">
+                                <AlertCircle size={12} /> {validationIssues.length} Alertas
+                              </div>
+                            )}
+                            <div className="flex gap-1">
+                              <div title={`Clique->Página: ${clickToPage.toFixed(1)}%`} className={`w-2 h-2 rounded-full ${clickToPage >= 70 ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                              <div title={`Página->Checkout: ${pageToCheckout.toFixed(1)}%`} className={`w-2 h-2 rounded-full ${pageToCheckout >= 5 ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                              <div title={`Checkout->Compra: ${checkoutToPurchase.toFixed(1)}%`} className={`w-2 h-2 rounded-full ${checkoutToPurchase >= 30 ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                              <div title={`Conv. Final: ${finalConv.toFixed(1)}%`} className={`w-2 h-2 rounded-full ${finalConv >= 1 ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                            </div>
+                          </div>
                         </td>
                         <td className="p-4 text-right">
                           <button 
@@ -584,7 +734,7 @@ export default function App() {
               <div className="p-6 space-y-4">
                 <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl text-xs text-blue-400">
                   <p className="font-bold mb-1">Ordem esperada das colunas (separadas por TAB ou Vírgula):</p>
-                  <p>Campanha, Criativo, Página, Impressões, Cliques, Visitas, Vendas, Gasto, Preço</p>
+                  <p>Campanha, Criativo, Página, Impressões, Cliques, Visitas, Checkouts, Vendas, Gasto, Preço</p>
                 </div>
                 
                 <textarea 
