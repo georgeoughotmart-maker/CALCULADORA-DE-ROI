@@ -15,6 +15,7 @@ type SortDirection = 'asc' | 'desc';
 export default function App() {
   const [dados, setDados] = useState<FunnelData[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({
@@ -159,6 +160,11 @@ export default function App() {
 
     return result;
   }, [dados, searchTerm, sortConfig]);
+
+  const selectedCampaign = useMemo(() => {
+    if (selectedId) return dados.find(d => d.id === selectedId);
+    return filteredAndSortedData[0];
+  }, [selectedId, dados, filteredAndSortedData]);
 
   const SortIndicator = ({ column }: { column: SortKey }) => {
     if (sortConfig.key !== column) return <div className="w-4" />;
@@ -450,48 +456,57 @@ export default function App() {
             <div className="bg-[#151515] p-6 rounded-2xl border border-white/5 shadow-xl">
               <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                 <CheckCircle2 size={20} className="text-emerald-500" />
-                Benchmarks de Validação
+                Análise de Validação
               </h3>
-              <div className="space-y-4">
-                <div className="p-4 rounded-xl bg-white/5 border border-white/5">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm text-gray-400">Clique → Página</span>
-                    <span className="text-sm font-bold text-emerald-500">70%+</span>
+              
+              {selectedCampaign ? (
+                <div className="space-y-6">
+                  <div className="mb-4">
+                    <p className="text-xs text-gray-500 uppercase font-bold">Campanha Selecionada</p>
+                    <p className="text-sm font-bold text-[#4da3ff] truncate">{selectedCampaign.campanha}</p>
                   </div>
-                  <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-500 w-[70%]" />
-                  </div>
+
+                  {(() => {
+                    const m = calculateMetrics(selectedCampaign);
+                    const steps = [
+                      { label: 'Clique → Página', val: m.clickToPage, goal: 70, icon: <MousePointer2 size={14} /> },
+                      { label: 'Página → Checkout', val: m.pageToCheckout, goal: 5, icon: <ShoppingCart size={14} /> },
+                      { label: 'Checkout → Compra', val: m.checkoutToPurchase, goal: 30, icon: <DollarSign size={14} /> },
+                      { label: 'Conversão Final', val: m.finalConv, goal: 1, icon: <TrendingUp size={14} /> },
+                    ];
+
+                    return steps.map((step, i) => (
+                      <div key={i} className="space-y-2">
+                        <div className="flex justify-between items-end">
+                          <div className="flex items-center gap-2 text-xs text-gray-400">
+                            {step.icon}
+                            {step.label}
+                          </div>
+                          <div className={`text-sm font-black ${step.val >= step.goal ? 'text-emerald-500' : 'text-red-500'}`}>
+                            {step.val.toFixed(1)}%
+                            <span className="text-[10px] text-gray-600 ml-1 font-normal">/ {step.goal}%</span>
+                          </div>
+                        </div>
+                        <div className="h-3 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${Math.min(step.val, 100)}%` }}
+                            className={`h-full ${step.val >= step.goal ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]'}`}
+                          />
+                        </div>
+                      </div>
+                    ));
+                  })()}
                 </div>
-                <div className="p-4 rounded-xl bg-white/5 border border-white/5">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm text-gray-400">Página → Checkout</span>
-                    <span className="text-sm font-bold text-emerald-500">5%+</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-500 w-[5%]" />
-                  </div>
+              ) : (
+                <div className="h-64 flex flex-col items-center justify-center text-center p-6 text-gray-600 border-2 border-dashed border-white/5 rounded-2xl">
+                  <HelpCircle size={40} className="mb-2 opacity-20" />
+                  <p className="text-sm">Adicione ou selecione uma campanha para ver a validação detalhada.</p>
                 </div>
-                <div className="p-4 rounded-xl bg-white/5 border border-white/5">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm text-gray-400">Checkout → Compra</span>
-                    <span className="text-sm font-bold text-emerald-500">30%+</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-500 w-[30%]" />
-                  </div>
-                </div>
-                <div className="p-4 rounded-xl bg-white/5 border border-white/5">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm text-gray-400">Conversão Final</span>
-                    <span className="text-sm font-bold text-emerald-500">1% - 5%</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden flex">
-                    <div className="h-full bg-emerald-500 w-[5%] ml-[1%]" />
-                  </div>
-                </div>
-              </div>
+              )}
+              
               <p className="mt-6 text-[10px] text-gray-500 leading-relaxed italic">
-                * Use estes valores como referência para pausar ou escalar seus criativos e páginas.
+                * Barras verdes indicam que a etapa está dentro do benchmark ideal.
               </p>
             </div>
           </section>
@@ -555,6 +570,7 @@ export default function App() {
                     <SortIndicator column="conv" />
                   </div>
                 </th>
+                <th className="p-4 text-xs font-bold text-[#4da3ff] uppercase tracking-widest text-center">Inic. Compra</th>
                 <th 
                   onClick={() => handleSort('receita')}
                   className="p-4 text-xs font-bold text-[#4da3ff] uppercase tracking-widest text-center cursor-pointer hover:bg-white/5 transition-colors"
@@ -614,20 +630,22 @@ export default function App() {
                     const validationIssues = getValidationStatus();
 
                     return (
-                      <motion.tr 
-                        key={d.id}
-                        layout
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        className="hover:bg-white/5 transition-colors group"
-                      >
+                        <motion.tr 
+                          key={d.id}
+                          layout
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          onClick={() => setSelectedId(d.id)}
+                          className={`hover:bg-white/5 transition-colors group cursor-pointer ${selectedId === d.id ? 'bg-blue-500/5 border-l-2 border-blue-500' : ''}`}
+                        >
                         <td className="p-4">
                           <div className="font-bold text-white">{d.campanha}</div>
                           <div className="text-xs text-gray-500">{d.criativo} • {d.pagina || 'Sem página'}</div>
                         </td>
                         <td className="p-4 text-center font-mono">{ctr.toFixed(2)}%</td>
                         <td className="p-4 text-center font-mono text-gray-400">R$ {cpc.toFixed(2)}</td>
+                        <td className="p-4 text-center font-mono text-amber-400">{d.checkouts}</td>
                         <td className="p-4 text-center font-mono">{conv.toFixed(2)}%</td>
                         <td className="p-4 text-center font-mono text-blue-400">R$ {receita.toFixed(2)}</td>
                         <td className={`p-4 text-center font-bold font-mono ${lucro >= 0 ? 'text-[#00e676]' : 'text-[#ff5252]'}`}>
@@ -642,22 +660,23 @@ export default function App() {
                           </span>
                         </td>
                         <td className="p-4 text-center">
-                          <div className="flex flex-col items-center gap-1">
-                            {validationIssues.length === 0 ? (
-                              <div className="flex items-center gap-1 text-emerald-500 text-[10px] font-bold uppercase">
-                                <CheckCircle2 size={12} /> Validada
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="flex gap-1.5">
+                              <div title={`Clique->Página: ${clickToPage.toFixed(1)}%`} className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${clickToPage >= 70 ? 'bg-emerald-500/20 text-emerald-500' : 'bg-red-500/20 text-red-500'}`}>
+                                {clickToPage.toFixed(0)}%
                               </div>
-                            ) : (
-                              <div className="flex items-center gap-1 text-amber-500 text-[10px] font-bold uppercase">
-                                <AlertCircle size={12} /> {validationIssues.length} Alertas
+                              <div title={`Página->Checkout: ${pageToCheckout.toFixed(1)}%`} className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${pageToCheckout >= 5 ? 'bg-emerald-500/20 text-emerald-500' : 'bg-red-500/20 text-red-500'}`}>
+                                {pageToCheckout.toFixed(0)}%
                               </div>
-                            )}
-                            <div className="flex gap-1">
-                              <div title={`Clique->Página: ${clickToPage.toFixed(1)}%`} className={`w-2 h-2 rounded-full ${clickToPage >= 70 ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                              <div title={`Página->Checkout: ${pageToCheckout.toFixed(1)}%`} className={`w-2 h-2 rounded-full ${pageToCheckout >= 5 ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                              <div title={`Checkout->Compra: ${checkoutToPurchase.toFixed(1)}%`} className={`w-2 h-2 rounded-full ${checkoutToPurchase >= 30 ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                              <div title={`Conv. Final: ${finalConv.toFixed(1)}%`} className={`w-2 h-2 rounded-full ${finalConv >= 1 ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                              <div title={`Checkout->Compra: ${checkoutToPurchase.toFixed(1)}%`} className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${checkoutToPurchase >= 30 ? 'bg-emerald-500/20 text-emerald-500' : 'bg-red-500/20 text-red-500'}`}>
+                                {checkoutToPurchase.toFixed(0)}%
+                              </div>
                             </div>
+                            {validationIssues.length === 0 ? (
+                              <span className="text-[9px] text-emerald-500 font-bold uppercase tracking-tighter">OK</span>
+                            ) : (
+                              <span className="text-[9px] text-red-500 font-bold uppercase tracking-tighter">{validationIssues.length} ALERTA(S)</span>
+                            )}
                           </div>
                         </td>
                         <td className="p-4 text-right">
